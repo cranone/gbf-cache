@@ -55,6 +55,9 @@ public class CacheService {
                 mediaType="text/javascript;charset=UTF-8";
             }else if(file.getPath().endsWith(".css")) {
                 mediaType="text/css;charset=UTF-8";
+            }else if(file.getPath().endsWith(".woff")) {
+                mediaType="application/font-woff";
+                headers.set("Content-Disposition", null);
             }
             headers.setContentType(MediaType.valueOf(mediaType));
             headers.setConnection("keep-alive");
