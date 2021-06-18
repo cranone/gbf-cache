@@ -18,11 +18,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public HttpMessageConverters fastJsonConfigure() {
         FastJsonHttpMessageConverter converter = new FastJsonHttpMessageConverter();
         FastJsonConfig fastJsonConfig = new FastJsonConfig();
-        fastJsonConfig.setSerializerFeatures(SerializerFeature.PrettyFormat);
+        fastJsonConfig.setSerializerFeatures(SerializerFeature.PrettyFormat,SerializerFeature.DisableCircularReferenceDetect);
         // 日期格式化
         fastJsonConfig.setDateFormat("yyyy-MM-dd HH:mm:ss");
         converter.setFastJsonConfig(fastJsonConfig);
-        converter.setSupportedMediaTypes(Arrays.asList(MediaType.APPLICATION_JSON));
+        converter.setSupportedMediaTypes(Arrays.asList(MediaType.APPLICATION_JSON,MediaType.APPLICATION_JSON_UTF8));
         return new HttpMessageConverters(converter);
     }
 }
