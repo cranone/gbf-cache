@@ -83,7 +83,7 @@ public class CacheService {
                     FileUtils.writeStringToFile(fileMapping, mapping.toJSONString(), StandardCharsets.UTF_8);
                     try (FileOutputStream fs = new FileOutputStream(file);
                          FileChannel fc = fs.getChannel();
-                         ResponseBody body = result.body();) {
+                         ResponseBody body = result.body()) {
                         assert body != null;
                         byte[] bytes = body.bytes();
                         ByteBuffer bb = ByteBuffer.wrap(bytes);
@@ -91,8 +91,6 @@ public class CacheService {
                         bb.flip();
                         fc.write(bb);
                     }
-//                    SimpleDateFormat sdfHeader = new SimpleDateFormat("EEE,dd MMM yyyy HH:mm:ss Z", Locale.US);
-//                    boolean setLastModified = file.setLastModified(sdfHeader.parse(result.headers().get("Last-Modified")).getTime());
                     logger.info("Complete:{}", uri);
                 }, throwable -> {
                     Files.delete(file.toPath());
