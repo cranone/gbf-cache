@@ -1,7 +1,9 @@
 package com.shadego.gbf.service;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONPath;
+import com.alibaba.fastjson.parser.Feature;
 import com.shadego.gbf.utils.RetrofitFactory;
 import io.reactivex.disposables.Disposable;
 import okhttp3.ResponseBody;
@@ -34,6 +36,19 @@ public class CacheService {
     @Value("${cache.path}")
     private String cachePath;
 
+    public ResponseEntity<JSON> createResponseString(HttpServletRequest request){
+        ResponseEntity<JSON> response=null;
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            File file = this.download(request,headers);
+            JSON json=(JSON) JSON.parse(FileUtils.readFileToString(file,StandardCharsets.UTF_8), Feature.OrderedField);
+            response=new ResponseEntity<>(json,headers, HttpStatus.OK);
+        } catch (Exception e) {
+            logger.error(e.getMessage(),e);
+        }
+        return response;
+    }
+
     public ResponseEntity<byte[]> createResponse(HttpServletRequest request){
         ResponseEntity<byte[]> response=null;
         try {
@@ -53,7 +68,7 @@ public class CacheService {
         //获取URI
         String uri= request.getRequestURI();
         //获取顶级域名
-        String topDomain=fullURL.replaceAll("http[s]?://.*?(\\w+\\.\\w+)/.*", "$1");
+        String topDomain=fullURL.replaceAll("http[s]?://.*?([\\w|\\-]+\\.\\w+)/.*", "$1");
         //GET参数
         String queryString=request.getQueryString();
         String requestUrl=StringUtils.isBlank(queryString)?fullURL:fullURL+"?"+queryString;
@@ -78,6 +93,8 @@ public class CacheService {
                         headers.set(item, headerValue);
                         headerJson.put(item, headerValue);
                     });
+                    headers.set("Access-Control-Allow-Origin", "*");
+                    headerJson.put("Access-Control-Allow-Origin", "*");
                     JSONPath.set(mapping, "$.response.headers", headerJson);
                     //写入映射文件
                     FileUtils.writeStringToFile(fileMapping, mapping.toJSONString(), StandardCharsets.UTF_8);
