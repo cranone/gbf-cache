@@ -88,13 +88,13 @@ public class CacheService {
                 .retry(3)
                 .subscribe(result -> {
                     JSONObject headerJson = new JSONObject();
+                    headers.set("Access-Control-Allow-Origin", "*");
+                    headerJson.put("Access-Control-Allow-Origin", "*");
                     result.headers().names().forEach(item -> {
                         String headerValue = result.headers().get(item);
                         headers.set(item, headerValue);
                         headerJson.put(item, headerValue);
                     });
-                    headers.set("Access-Control-Allow-Origin", "*");
-                    headerJson.put("Access-Control-Allow-Origin", "*");
                     JSONPath.set(mapping, "$.response.headers", headerJson);
                     //写入映射文件
                     FileUtils.writeStringToFile(fileMapping, mapping.toJSONString(), StandardCharsets.UTF_8);
