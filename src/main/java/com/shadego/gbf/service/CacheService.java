@@ -4,6 +4,8 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONPath;
 import com.alibaba.fastjson.parser.Feature;
+import com.shadego.gbf.entity.param.DownloadData;
+import com.shadego.gbf.utils.GZIPCompression;
 import com.shadego.gbf.utils.RetrofitFactory;
 import io.reactivex.disposables.Disposable;
 import okhttp3.ResponseBody;
@@ -16,17 +18,20 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class CacheService {
@@ -36,13 +41,19 @@ public class CacheService {
     @Value("${cache.path}")
     private String cachePath;
 
-    public ResponseEntity<JSON> createResponseString(HttpServletRequest request){
-        ResponseEntity<JSON> response=null;
+    public ResponseEntity<byte[]> createResponseString(HttpServletRequest request){
+        ResponseEntity<byte[]> response=null;
         try {
             HttpHeaders headers = new HttpHeaders();
-            File file = this.download(request,headers);
-            JSON json=(JSON) JSON.parse(FileUtils.readFileToString(file,StandardCharsets.UTF_8), Feature.OrderedField);
-            response=new ResponseEntity<>(json,headers, HttpStatus.OK);
+            DownloadData data = this.download(request,headers);
+            JSON json=(JSON) JSON.parse(FileUtils.readFileToString(new File(data.getPath()),StandardCharsets.UTF_8), Feature.OrderedField);
+            String str=json.toJSONString();
+            byte[] result=str.getBytes(StandardCharsets.UTF_8);
+            List<String> encoding = headers.get("content-encoding");
+            if(!CollectionUtils.isEmpty(encoding)&&"gzip".equalsIgnoreCase(encoding.get(0))){
+                result=GZIPCompression.compress(str);
+            }
+            response=new ResponseEntity<>(result,headers, HttpStatus.OK);
         } catch (Exception e) {
             logger.error(e.getMessage(),e);
         }
@@ -53,18 +64,26 @@ public class CacheService {
         ResponseEntity<byte[]> response=null;
         try {
             HttpHeaders headers = new HttpHeaders();
-            File file = this.download(request,headers);
-            Path path = Paths.get(file.getPath());
-            response=new ResponseEntity<>(Files.readAllBytes(path),headers, HttpStatus.OK);
+            DownloadData data = this.download(request,headers);
+            byte[] result=null;
+            if(data.getSuccess()){
+                Path path = Paths.get(data.getPath());
+                result=Files.readAllBytes(path);
+            }
+            response=new ResponseEntity<>(result,headers, HttpStatus.valueOf(data.getHttpCode()));
         } catch (Exception e) {
             logger.error(e.getMessage(),e);
         }
         return response;
     }
 
-    private File download(HttpServletRequest request,HttpHeaders headers) throws IOException {
+    private DownloadData download(HttpServletRequest request, HttpHeaders headers) throws IOException {
+        DownloadData data=new DownloadData();
         //获取URL
         String fullURL=request.getRequestURL().toString();
+        if(StringUtils.isNotBlank(request.getHeader("my-https"))){
+            fullURL=fullURL.replaceAll("http://","https://");
+        }
         //获取URI
         String uri= request.getRequestURI();
         //获取顶级域名
@@ -75,18 +94,36 @@ public class CacheService {
         String fileName=cachePath+"/"+topDomain+uri;
         File file=new File(fileName);
         File fileMapping=new File(fileName+".mapping");
+        data.setPath(file.getPath());
         //从本地读取缓存
         if(this.hasCache(file,fileMapping,headers,fullURL,queryString)){
-            return file;
+            data.setCached(true);
+            data.setSuccess(true);
+            data.setHttpCode(HttpStatus.OK.value());
+            return data;
         }
         //无文件或匹配不一致则重写文件
         boolean mkdirs = file.getParentFile().mkdirs();
         logger.info("Create:{}",fullURL);
         JSONObject mapping=new JSONObject();
         JSONPath.set(mapping,"$.request.queryString",queryString);
-        Disposable subscribe = RetrofitFactory.getInstance().getApiService().download(requestUrl)
+        Enumeration<String> headerNames = request.getHeaderNames();
+        Map<String, String> requestHeaders=new HashMap<>();
+        while(headerNames.hasMoreElements()){
+            String str = headerNames.nextElement();
+            //https请求
+            if("my-https".equals(str)){
+                continue;
+            }
+            requestHeaders.put(str,request.getHeader(str));
+        }
+        Disposable subscribe = RetrofitFactory.getInstance().getApiService().download(requestUrl,requestHeaders)
                 .retry(3)
                 .subscribe(result -> {
+                    data.setHttpCode(result.code());
+                    if(!result.isSuccessful()){
+                        throw new RuntimeException("服务器响应状态错误:"+data.getHttpCode());
+                    }
                     JSONObject headerJson = new JSONObject();
                     headers.set("Access-Control-Allow-Origin", "*");
                     headerJson.put("Access-Control-Allow-Origin", "*");
@@ -98,22 +135,38 @@ public class CacheService {
                     JSONPath.set(mapping, "$.response.headers", headerJson);
                     //写入映射文件
                     FileUtils.writeStringToFile(fileMapping, mapping.toJSONString(), StandardCharsets.UTF_8);
-                    try (FileOutputStream fs = new FileOutputStream(file);
-                         FileChannel fc = fs.getChannel();
-                         ResponseBody body = result.body()) {
-                        assert body != null;
-                        byte[] bytes = body.bytes();
-                        ByteBuffer bb = ByteBuffer.wrap(bytes);
-                        bb.put(bytes);
-                        bb.flip();
-                        fc.write(bb);
+
+//                    if("gzip".equalsIgnoreCase(result.headers().get("content-encoding"))){
+//                        FileUtils.writeByteArrayToFile(file,GZIPCompression.decompress(result.body().bytes()).getBytes(StandardCharsets.UTF_8));
+//                    }else{
+//                        FileUtils.writeByteArrayToFile(file,result.body().bytes());
+//                    }
+                    try (ResponseBody body = result.body()){
+                        if(body==null){
+                            throw new RuntimeException("服务器无响应数据");
+                        }
+                        FileUtils.writeByteArrayToFile(file,body.bytes());
                     }
+//                    FileUtils.writeStringToFile(file,result.body().string(),StandardCharsets.UTF_8);
+//                    try (FileOutputStream fs = new FileOutputStream(file);
+//                         FileChannel fc = fs.getChannel();
+//                         ResponseBody body = result.body()) {
+//                        assert body != null;
+//                        byte[] bytes = body.bytes();
+//                        ByteBuffer bb = ByteBuffer.wrap(bytes);
+//                        bb.put(bytes);
+//                        bb.flip();
+//                        fc.write(bb);
+//                    }
                     logger.info("Complete:{}", uri);
+                    data.setSuccess(true);
                 }, throwable -> {
-                    Files.delete(file.toPath());
-                    logger.error(throwable.getMessage(), throwable);
+                    logger.error("下载异常:{}",throwable.getMessage());
+                    if(file.exists())
+                        FileUtils.delete(file);
                 });
-        return file;
+        data.setCached(false);
+        return data;
     }
 
     private boolean hasCache(File file,File fileMapping,HttpHeaders headers,String fullURL,String queryString) throws IOException {

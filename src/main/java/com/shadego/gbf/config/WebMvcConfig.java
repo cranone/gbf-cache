@@ -19,7 +19,7 @@ import com.alibaba.fastjson.support.spring.FastJsonHttpMessageConverter;
 
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
-    @Bean
+    //@Bean
     public HttpMessageConverters fastJsonConfigure() {
         FastJsonHttpMessageConverter converter = new FastJsonHttpMessageConverter();
         FastJsonConfig fastJsonConfig = new FastJsonConfig();

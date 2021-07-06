@@ -1,5 +1,6 @@
 package com.shadego.gbf.utils;
 
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -21,9 +22,10 @@ public class RetrofitFactory {
 		OkHttpClient httpClient = new OkHttpClient.Builder().addInterceptor(chain -> {
 			Request.Builder builder = chain.request().newBuilder();
 			builder.addHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36")
-				.addHeader("accept", "*/*")
-				.addHeader("connection", "Keep-Alive")
-				.addHeader("contentType", "text/html;charset=uft-8")
+				//.addHeader("accept", "*/*")
+				//.addHeader("accept-charset", "UTF-8")
+				//.addHeader("connection", "Keep-Alive")
+				//.addHeader("Content-Type", "text/html;charset=uft-8")
 			;
             return chain.proceed(builder.build());
 		}).connectTimeout(10, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build();

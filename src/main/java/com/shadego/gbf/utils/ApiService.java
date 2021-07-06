@@ -6,10 +6,9 @@ import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import okhttp3.ResponseBody;
 import retrofit2.Response;
-import retrofit2.http.GET;
-import retrofit2.http.HEAD;
-import retrofit2.http.Streaming;
-import retrofit2.http.Url;
+import retrofit2.http.*;
+
+import java.util.Map;
 
 /**
 * @author Maclaine E-mail:deathencyclopedia@gmail.com
@@ -23,6 +22,10 @@ public interface ApiService {
 	@Streaming
 	@GET
 	public Flowable<Response<ResponseBody>> download(@Url String url);
+
+	@Streaming
+	@GET
+	public Flowable<Response<ResponseBody>> download(@Url String url,@HeaderMap Map<String, String> headers);
 	
 	@HEAD
     public Flowable<Response<Void>> downloadHeader(@Url String url);

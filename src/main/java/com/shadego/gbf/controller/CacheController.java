@@ -23,8 +23,8 @@ public class CacheController {
     private CacheService cacheService;
 
     @ResponseBody
-    @GetMapping(value="/**/*.json", produces =MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<JSON> cacheString(HttpServletRequest request, HttpServletResponse response) {
+    //@GetMapping(value="/**/*.json", produces =MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<byte[]> cacheString(HttpServletRequest request, HttpServletResponse response) {
         return cacheService.createResponseString(request);
     }
 
