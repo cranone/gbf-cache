@@ -16,7 +16,7 @@ import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 public class RetrofitFactory {
     private static final Logger logger = LoggerFactory.getLogger(RetrofitFactory.class);
 	private static RetrofitFactory mInstance;
-	private ApiService apiService;
+	private final ApiService apiService;
 
 	public RetrofitFactory() {
 		OkHttpClient httpClient = new OkHttpClient.Builder().addInterceptor(chain -> {

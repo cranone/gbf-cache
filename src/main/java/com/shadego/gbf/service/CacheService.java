@@ -31,7 +31,6 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class CacheService {
@@ -50,7 +49,7 @@ public class CacheService {
             String str=json.toJSONString();
             byte[] result=str.getBytes(StandardCharsets.UTF_8);
             List<String> encoding = headers.get("content-encoding");
-            if(!CollectionUtils.isEmpty(encoding)&&"gzip".equalsIgnoreCase(encoding.get(0))){
+            if(!CollectionUtils.isEmpty(encoding)&&encoding.contains("gzip")){
                 result=GZIPCompression.compress(str);
             }
             response=new ResponseEntity<>(result,headers, HttpStatus.OK);
@@ -97,9 +96,14 @@ public class CacheService {
         data.setPath(file.getPath());
         //从本地读取缓存
         if(this.hasCache(file,fileMapping,headers,fullURL,queryString)){
+            if(this.isAlwaysCache(request)){
+                data.setSuccess(false);
+                data.setHttpCode(HttpStatus.NOT_MODIFIED.value());
+            }else{
+                data.setSuccess(true);
+                data.setHttpCode(HttpStatus.OK.value());
+            }
             data.setCached(true);
-            data.setSuccess(true);
-            data.setHttpCode(HttpStatus.OK.value());
             return data;
         }
         //无文件或匹配不一致则重写文件
@@ -191,5 +195,10 @@ public class CacheService {
             }
         }
         return false;
+    }
+
+    private boolean isAlwaysCache(HttpServletRequest request){
+        return StringUtils.isNotBlank(request.getHeader("If-Modified-Since"))
+                ||StringUtils.isNotBlank(request.getHeader("If-None-Match"));
     }
 }
