@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONPath;
 import com.alibaba.fastjson.parser.Feature;
+import com.shadego.gbf.entity.param.CacheData;
 import com.shadego.gbf.entity.param.DownloadData;
 import com.shadego.gbf.utils.GZIPCompression;
 import com.shadego.gbf.utils.RetrofitFactory;
@@ -94,15 +95,18 @@ public class CacheService {
         File file=new File(fileName);
         File fileMapping=new File(fileName+".mapping");
         data.setPath(file.getPath());
+        boolean alwaysCache = this.isAlwaysCache(request);
+        CacheData cacheData=new CacheData();
+        cacheData.setFile(file);
+        cacheData.setFileMapping(fileMapping);
+        cacheData.setHeaders(headers);
+        cacheData.setFullURL(fullURL);
+        cacheData.setQueryString(queryString);
+        cacheData.setAlwaysCache(alwaysCache);
         //从本地读取缓存
-        if(this.hasCache(file,fileMapping,headers,fullURL,queryString)){
-            if(this.isAlwaysCache(request)){
-                data.setSuccess(false);
-                data.setHttpCode(HttpStatus.NOT_MODIFIED.value());
-            }else{
-                data.setSuccess(true);
-                data.setHttpCode(HttpStatus.OK.value());
-            }
+        if(this.hasCache(cacheData)){
+            data.setSuccess(!alwaysCache);
+            data.setHttpCode(cacheData.getHttpStatus().value());
             data.setCached(true);
             return data;
         }
@@ -139,29 +143,12 @@ public class CacheService {
                     JSONPath.set(mapping, "$.response.headers", headerJson);
                     //写入映射文件
                     FileUtils.writeStringToFile(fileMapping, mapping.toJSONString(), StandardCharsets.UTF_8);
-
-//                    if("gzip".equalsIgnoreCase(result.headers().get("content-encoding"))){
-//                        FileUtils.writeByteArrayToFile(file,GZIPCompression.decompress(result.body().bytes()).getBytes(StandardCharsets.UTF_8));
-//                    }else{
-//                        FileUtils.writeByteArrayToFile(file,result.body().bytes());
-//                    }
                     try (ResponseBody body = result.body()){
                         if(body==null){
                             throw new RuntimeException("服务器无响应数据");
                         }
                         FileUtils.writeByteArrayToFile(file,body.bytes());
                     }
-//                    FileUtils.writeStringToFile(file,result.body().string(),StandardCharsets.UTF_8);
-//                    try (FileOutputStream fs = new FileOutputStream(file);
-//                         FileChannel fc = fs.getChannel();
-//                         ResponseBody body = result.body()) {
-//                        assert body != null;
-//                        byte[] bytes = body.bytes();
-//                        ByteBuffer bb = ByteBuffer.wrap(bytes);
-//                        bb.put(bytes);
-//                        bb.flip();
-//                        fc.write(bb);
-//                    }
                     logger.info("Complete:{}", uri);
                     data.setSuccess(true);
                 }, throwable -> {
@@ -173,7 +160,10 @@ public class CacheService {
         return data;
     }
 
-    private boolean hasCache(File file,File fileMapping,HttpHeaders headers,String fullURL,String queryString) throws IOException {
+    private boolean hasCache(CacheData cacheData) throws IOException {
+        File fileMapping = cacheData.getFileMapping();
+        String queryString = cacheData.getQueryString();
+        File file = cacheData.getFile();
         if(fileMapping.exists()&&fileMapping.length()>0){
             //获取文件参数
             String fileStr = FileUtils.readFileToString(fileMapping, StandardCharsets.UTF_8);
@@ -185,11 +175,11 @@ public class CacheService {
             }
             //匹配一致则使用缓存
             if(file.exists()&&file.length()>0) {
-                logger.info("Cache:{}",fullURL);
+                logger.info("[{}]Cache:{}",cacheData.getHttpStatus().value(),cacheData.getFullURL());
                 //回写header
                 JSONObject headerJson= (JSONObject) JSONPath.eval(mapping,"$.response.headers");
                 for (String header : headerJson.keySet()) {
-                    headers.set(header,headerJson.getString(header));
+                    cacheData.getHeaders().set(header,headerJson.getString(header));
                 }
                 return true;
             }
