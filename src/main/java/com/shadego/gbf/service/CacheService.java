@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONPath;
 import com.alibaba.fastjson.parser.Feature;
 import com.shadego.gbf.entity.param.CacheData;
+import com.shadego.gbf.entity.param.CacheProperties;
 import com.shadego.gbf.entity.param.DownloadData;
 import com.shadego.gbf.utils.GZIPCompression;
 import com.shadego.gbf.utils.RetrofitFactory;
@@ -21,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.io.IOException;
@@ -28,10 +30,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.regex.Pattern;
 
 @Service
 public class CacheService {
@@ -40,6 +40,8 @@ public class CacheService {
 
     @Value("${cache.path}")
     private String cachePath;
+    @Resource
+    private CacheProperties cacheProperties;
 
     public ResponseEntity<byte[]> createResponseString(HttpServletRequest request){
         ResponseEntity<byte[]> response=null;
@@ -164,7 +166,7 @@ public class CacheService {
         File fileMapping = cacheData.getFileMapping();
         String queryString = cacheData.getQueryString();
         File file = cacheData.getFile();
-        if(fileMapping.exists()&&fileMapping.length()>0){
+        if(fileMapping.exists()&&fileMapping.length()>0&&!isExclude(cacheData.getFullURL(),cacheProperties.getExcludePattern())){
             //获取文件参数
             String fileStr = FileUtils.readFileToString(fileMapping, StandardCharsets.UTF_8);
             JSONObject mapping = JSONObject.parseObject(fileStr);
@@ -187,8 +189,22 @@ public class CacheService {
         return false;
     }
 
+    private boolean isExclude(String uri,List<Pattern> patternList){
+        //判断是否被排除
+        for (Pattern pattern : patternList) {
+            if(pattern.matcher(uri).find()){
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isAlwaysCache(HttpServletRequest request){
+        if(isExclude(request.getRequestURL().toString(), cacheProperties.getExcludeModifiedPattern())){
+            return false;
+        }
         return StringUtils.isNotBlank(request.getHeader("If-Modified-Since"))
                 ||StringUtils.isNotBlank(request.getHeader("If-None-Match"));
     }
+
 }
