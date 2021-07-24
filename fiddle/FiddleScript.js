@@ -149,9 +149,9 @@ class Handlers
     UI.actUpdateInspector(true,true);
 }
 
-    static var p_URIEndWith: String[] = [".png",".jpg",".mp3",".mp4",".css",".woff",".json",".js"];
+    static var p_URIEndWith: String[] = [".png",".jpg",".mp3",".mp4",".css",".woff",".json",".js",".txt"];
     static var p_URIInclude: String[] = ["jewepri.com/ImageData"];
-    static var p_URIExculde: String[] = ["deepone-online.com/footer/js/footer.js"];
+    //static var p_URIExculde: String[] = ["deepone-online.com/footer/js/footer.js"];
 
     static function StrArrEndWith(str: String,arr :String[]): Boolean{
     for (var x:int = 0; x < arr.Length; x++){
@@ -234,16 +234,12 @@ class Handlers
         oSession["X-AutoAuth"] = "(default)";
     }
     var url=oSession.fullUrl;
-    if(StrArrInclude(url,p_URIExculde)){
-        return;
-    }
-
     if (m_AlwaysFresh && (oSession.oRequest.headers.Exists("If-Modified-Since") || oSession.oRequest.headers.Exists("If-None-Match")))
     {
         oSession.utilCreateResponseAndBypassServer();
         oSession.responseCode = 304;
         oSession["ui-backcolor"] = "Lavender";
-        return;
+        //return;
     }
     //FiddlerApplication.Log.LogString(StrArrEndWith(url,p_URIEndWith)+"TEST");
     if (!oSession.HTTPMethodIs("CONNECT")&&(StrArrEndWith(url.Substring(0,url.IndexOf("?")>0?url.IndexOf("?"):url.Length),p_URIEndWith)||StrArrInclude(url,p_URIInclude))){
