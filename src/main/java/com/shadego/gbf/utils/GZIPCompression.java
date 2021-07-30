@@ -30,7 +30,7 @@ public class GZIPCompression {
 
             String line;
             while ((line = bufferedReader.readLine()) != null) {
-                outStr.append(line);
+                outStr.append(line).append("\n");
             }
         } else {
             outStr.append(Arrays.toString(compressed));

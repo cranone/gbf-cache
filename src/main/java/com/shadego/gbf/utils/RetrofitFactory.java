@@ -1,17 +1,14 @@
 package com.shadego.gbf.utils;
 
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.TimeUnit;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.alibaba.fastjson.support.retrofit.Retrofit2ConverterFactory;
-
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
+
+import java.util.concurrent.TimeUnit;
 
 public class RetrofitFactory {
     private static final Logger logger = LoggerFactory.getLogger(RetrofitFactory.class);
@@ -39,7 +36,9 @@ public class RetrofitFactory {
 	public static RetrofitFactory getInstance() {
 		if (mInstance == null) {
 			synchronized (RetrofitFactory.class) {
-				mInstance = new RetrofitFactory();
+				if(mInstance == null){
+					mInstance = new RetrofitFactory();
+				}
 			}
 		}
 		return mInstance;
