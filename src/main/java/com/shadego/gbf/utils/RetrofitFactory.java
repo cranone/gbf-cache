@@ -12,7 +12,6 @@ import java.util.concurrent.TimeUnit;
 
 public class RetrofitFactory {
     private static final Logger logger = LoggerFactory.getLogger(RetrofitFactory.class);
-	private static RetrofitFactory mInstance;
 	private final ApiService apiService;
 
 	public RetrofitFactory() {
@@ -25,7 +24,7 @@ public class RetrofitFactory {
 				//.addHeader("Content-Type", "text/html;charset=uft-8")
 			;
             return chain.proceed(builder.build());
-		}).connectTimeout(10, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build();
+		}).connectTimeout(5, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS).build();
 		Retrofit retrofit = new Retrofit.Builder().client(httpClient).baseUrl("http://127.0.0.1/")
 		         .addConverterFactory(new Retrofit2ConverterFactory())
 		        .addCallAdapterFactory(RxJava2CallAdapterFactory.create()).build();
@@ -33,15 +32,12 @@ public class RetrofitFactory {
 		logger.info("Retrofit init ok");
 	}
 
+	private static final class MInstanceHolder {
+		private static final RetrofitFactory mInstance = new RetrofitFactory();
+	}
+
 	public static RetrofitFactory getInstance() {
-		if (mInstance == null) {
-			synchronized (RetrofitFactory.class) {
-				if(mInstance == null){
-					mInstance = new RetrofitFactory();
-				}
-			}
-		}
-		return mInstance;
+		return MInstanceHolder.mInstance;
 	}
 
 	public ApiService getApiService() {

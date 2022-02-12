@@ -37,22 +37,15 @@ public class CacheProperties {
 
     public void setUrlExclude(List<String> urlExclude) {
         this.urlExclude = urlExclude;
+        this.excludePattern =new ArrayList<>();
+        for (String exclude : this.urlExclude) {
+            this.excludePattern.add(Pattern.compile(exclude));
+        }
     }
 
     public List<Pattern> getExcludePattern() {
-        //初始化
-        if(CollectionUtils.isEmpty(this.urlExclude)){
-            return Collections.emptyList();
-        }
-        if(this.excludePattern ==null){
-            this.excludePattern =new ArrayList<>();
-            for (String exclude : this.urlExclude) {
-                this.excludePattern.add(Pattern.compile(exclude));
-            }
-        }
         return this.excludePattern;
     }
-
 
     public List<String> getUrlExcludeModified() {
         return urlExcludeModified;
