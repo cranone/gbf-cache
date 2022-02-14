@@ -11,7 +11,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>11</java.version>
+        <java.version>17</java.version>
         <retrofit>2.6.2</retrofit>
     </properties>
 
@@ -26,7 +26,6 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <!--<version>2.1.8.RELEASE</version>-->
         <version>2.6.3</version>
         <relativePath/>
     </parent>
