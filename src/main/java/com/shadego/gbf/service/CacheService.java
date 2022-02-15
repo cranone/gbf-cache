@@ -30,6 +30,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -37,9 +40,12 @@ import java.util.regex.Pattern;
 public class CacheService {
 
     private static final Logger logger = LoggerFactory.getLogger(CacheService.class);
+    private static final DateTimeFormatter DF_RFC = DateTimeFormatter.RFC_1123_DATE_TIME.withZone(ZoneId.of("GMT"));
 
     @Value("${cache.path}")
     private String cachePath;
+    @Value("${cache.refreshDate}")
+    private Boolean refreshDate;
     @Resource
     private CacheProperties cacheProperties;
 
@@ -181,7 +187,11 @@ public class CacheService {
                 //回写header
                 JSONObject headerJson= (JSONObject) JSONPath.eval(mapping,"$.response.headers");
                 for (String header : headerJson.keySet()) {
-                    cacheData.getHeaders().set(header,headerJson.getString(header));
+                    String value = headerJson.getString(header);
+                    if("Date".equals(header)&&refreshDate){
+                        value=DF_RFC.format(Instant.now());
+                    }
+                    cacheData.getHeaders().set(header, value);
                 }
                 return true;
             }
