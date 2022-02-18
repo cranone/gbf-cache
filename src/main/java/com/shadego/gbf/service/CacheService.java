@@ -8,9 +8,6 @@ import com.shadego.gbf.entity.param.CacheData;
 import com.shadego.gbf.entity.param.CacheProperties;
 import com.shadego.gbf.entity.param.DownloadData;
 import com.shadego.gbf.utils.GZIPCompression;
-import com.shadego.gbf.utils.RetrofitFactory;
-import io.reactivex.disposables.Disposable;
-import okhttp3.ResponseBody;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -33,7 +30,10 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 @Service
@@ -48,6 +48,8 @@ public class CacheService {
     private Boolean refreshDate;
     @Resource
     private CacheProperties cacheProperties;
+    @Resource
+    private NetService netService;
 
     public ResponseEntity<byte[]> createResponseString(HttpServletRequest request){
         ResponseEntity<byte[]> response=null;
@@ -133,37 +135,36 @@ public class CacheService {
             }
             requestHeaders.put(str,request.getHeader(str));
         }
-        Disposable subscribe = RetrofitFactory.getInstance().getApiService().download(requestUrl,requestHeaders)
-                .retry(3)
-                .subscribe(result -> {
-                    data.setHttpCode(result.code());
-                    if(!result.isSuccessful()){
-                        throw new RuntimeException("服务器响应状态错误:"+data.getHttpCode());
-                    }
-                    JSONObject headerJson = new JSONObject();
-                    headers.set("Access-Control-Allow-Origin", "*");
-                    headerJson.put("Access-Control-Allow-Origin", "*");
-                    result.headers().names().forEach(item -> {
-                        String headerValue = result.headers().get(item);
-                        headers.set(item, headerValue);
-                        headerJson.put(item, headerValue);
-                    });
-                    JSONPath.set(mapping, "$.response.headers", headerJson);
-                    //写入映射文件
-                    FileUtils.writeStringToFile(fileMapping, mapping.toJSONString(), StandardCharsets.UTF_8);
-                    try (ResponseBody body = result.body()){
-                        if(body==null){
-                            throw new RuntimeException("服务器无响应数据");
-                        }
-                        FileUtils.writeByteArrayToFile(file,body.bytes());
-                    }
-                    logger.info("Complete:{}", uri);
-                    data.setSuccess(true);
-                }, throwable -> {
-                    logger.error("下载异常:{}",throwable.getMessage());
-                    if(file.exists())
-                        FileUtils.delete(file);
-                });
+
+        try {
+            ResponseEntity<byte[]> result = netService.getBytes(requestUrl, requestHeaders);
+            data.setHttpCode(result.getStatusCodeValue());
+            if(!result.getStatusCode().is2xxSuccessful()){
+                throw new RuntimeException("服务器响应状态错误:"+data.getHttpCode());
+            }
+            JSONObject headerJson = new JSONObject();
+            headers.set("Access-Control-Allow-Origin", "*");
+            headerJson.put("Access-Control-Allow-Origin", "*");
+            result.getHeaders().forEach((key, value) -> {
+                String headerValue = value.get(0);
+                headers.set(key, headerValue);
+                headerJson.put(key, headerValue);
+            });
+            JSONPath.set(mapping, "$.response.headers", headerJson);
+            //写入映射文件
+            FileUtils.writeStringToFile(fileMapping, mapping.toJSONString(), StandardCharsets.UTF_8);
+            byte[] body = result.getBody();
+            if(body==null){
+                throw new RuntimeException("服务器无响应数据");
+            }
+            FileUtils.writeByteArrayToFile(file,body);
+            logger.info("Complete:{}", uri);
+            data.setSuccess(true);
+        }catch (Exception e){
+            logger.error("下载异常",e);
+            if(file.exists())
+                FileUtils.delete(file);
+        }
         data.setCached(false);
         return data;
     }

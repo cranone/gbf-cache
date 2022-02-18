@@ -1,10 +1,17 @@
 package com.shadego.gbf.entity.param;
 
+import org.springframework.http.HttpStatus;
+
 public class DownloadData {
     private String path;
     private boolean isCached;
     private Integer httpCode;
     private boolean isSuccess;
+
+    public DownloadData(){
+        //默认500
+        httpCode= HttpStatus.INTERNAL_SERVER_ERROR.value();
+    }
 
     public String getPath() {
         return path;
