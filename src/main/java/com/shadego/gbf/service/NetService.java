@@ -1,5 +1,7 @@
 package com.shadego.gbf.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.http.HttpEntity;
@@ -21,11 +23,13 @@ import java.util.Map;
 @Service
 @EnableAspectJAutoProxy(proxyTargetClass = true, exposeProxy = true)
 public class NetService {
+    private static final Logger logger = LoggerFactory.getLogger(NetService.class);
     @Resource
     private RestTemplate restTemplate;
 
-    @Retryable(value = RestClientException.class, maxAttempts = 3,backoff = @Backoff(delay = 100L,multiplier = 0.0))
+    @Retryable(value = RestClientException.class, maxAttemptsExpression = "${cache.maxAttempts:3}",backoff = @Backoff(delay = 100L,multiplier = 0.0))
     public ResponseEntity<byte[]> getBytes(String url, HttpHeaders headers){
+        logger.info("Downloading:{}", url);
         if(headers==null){
             headers=new HttpHeaders();
         }
