@@ -7,6 +7,7 @@ import com.alibaba.fastjson.parser.Feature;
 import com.shadego.gbf.entity.param.CacheData;
 import com.shadego.gbf.entity.param.CacheProperties;
 import com.shadego.gbf.entity.param.DownloadData;
+import com.shadego.gbf.exception.CacheException;
 import com.shadego.gbf.utils.GZIPCompression;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -140,7 +141,7 @@ public class CacheService {
             ResponseEntity<byte[]> result = netService.getBytes(requestUrl, requestHeaders);
             data.setHttpCode(result.getStatusCodeValue());
             if(!result.getStatusCode().is2xxSuccessful()){
-                throw new RuntimeException("服务器响应状态错误:"+data.getHttpCode());
+                throw new CacheException("服务器响应状态错误:"+data.getHttpCode());
             }
             JSONObject headerJson = new JSONObject();
             headers.set("Access-Control-Allow-Origin", "*");
@@ -155,11 +156,15 @@ public class CacheService {
             FileUtils.writeStringToFile(fileMapping, mapping.toJSONString(), StandardCharsets.UTF_8);
             byte[] body = result.getBody();
             if(body==null){
-                throw new RuntimeException("服务器无响应数据");
+                throw new CacheException("服务器无响应数据");
             }
             FileUtils.writeByteArrayToFile(file,body);
             logger.info("Complete:{}", uri);
             data.setSuccess(true);
+        } catch (CacheException e){
+            logger.error("下载异常:{}",e.getMessage());
+            if(file.exists())
+                FileUtils.delete(file);
         }catch (Exception e){
             logger.error("下载异常",e);
             if(file.exists())
