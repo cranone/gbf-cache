@@ -27,7 +27,7 @@ public class NetService {
     @Resource
     private RestTemplate restTemplate;
 
-    @Retryable(value = RestClientException.class, maxAttemptsExpression = "${cache.maxAttempts:3}",backoff = @Backoff(delay = 100L,multiplier = 0.0))
+    @Retryable(value = RestClientException.class, maxAttemptsExpression = "${cache.retry.maxAttempts:3}",backoff = @Backoff(delayExpression = "${cache.retry.delay:500}",multiplier = 0.0))
     public ResponseEntity<byte[]> getBytes(String url, HttpHeaders headers){
         logger.info("Downloading:{}", url);
         if(headers==null){

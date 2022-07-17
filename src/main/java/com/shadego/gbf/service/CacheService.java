@@ -1,14 +1,15 @@
 package com.shadego.gbf.service;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.JSONPath;
-import com.alibaba.fastjson.parser.Feature;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
+import com.alibaba.fastjson2.JSONPath;
+import com.alibaba.fastjson2.JSONReader;
 import com.shadego.gbf.entity.param.CacheData;
 import com.shadego.gbf.entity.param.CacheProperties;
 import com.shadego.gbf.entity.param.DownloadData;
 import com.shadego.gbf.exception.CacheException;
 import com.shadego.gbf.utils.GZIPCompression;
+import com.shadego.gbf.utils.JSONPathExtra;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -57,8 +58,8 @@ public class CacheService {
         try {
             HttpHeaders headers = new HttpHeaders();
             DownloadData data = this.download(request,headers);
-            JSON json=(JSON) JSON.parse(FileUtils.readFileToString(new File(data.getPath()),StandardCharsets.UTF_8), Feature.OrderedField);
-            String str=json.toJSONString();
+            JSON json=(JSON) JSON.parse(FileUtils.readFileToString(new File(data.getPath()),StandardCharsets.UTF_8), JSONReader.Feature.UseNativeObject);
+            String str=JSON.toJSONString(json);
             byte[] result=str.getBytes(StandardCharsets.UTF_8);
             List<String> encoding = headers.get("content-encoding");
             if(!CollectionUtils.isEmpty(encoding)&&encoding.contains("gzip")){
@@ -83,6 +84,7 @@ public class CacheService {
             }
             response=new ResponseEntity<>(result,headers, HttpStatus.valueOf(data.getHttpCode()));
         } catch (Exception e) {
+            logger.error("Error:{}",request.getRequestURL().toString());
             logger.error(e.getMessage(),e);
         }
         return response;
@@ -174,35 +176,42 @@ public class CacheService {
         return data;
     }
 
-    private boolean hasCache(CacheData cacheData) throws IOException {
-        File fileMapping = cacheData.getFileMapping();
-        String queryString = cacheData.getQueryString();
-        File file = cacheData.getFile();
-        if(fileMapping.exists()&&fileMapping.length()>0&&!isExclude(cacheData.getFullURL(),cacheProperties.getExcludePattern())){
-            //获取文件参数
-            String fileStr = FileUtils.readFileToString(fileMapping, StandardCharsets.UTF_8);
-            JSONObject mapping = JSONObject.parseObject(fileStr);
-            //判断是否存在QueryString并匹配
-            if(StringUtils.isNotBlank(queryString)&&!JSONPath.containsValue(mapping,"$.request.queryString",queryString)){
-                //不匹配
-                return false;
-            }
-            //匹配一致则使用缓存
-            if(file.exists()&&file.length()>0) {
-                logger.info("[{}]Cache:{}",cacheData.getHttpStatus().value(),cacheData.getFullURL());
-                //回写header
-                JSONObject headerJson= (JSONObject) JSONPath.eval(mapping,"$.response.headers");
-                for (String header : headerJson.keySet()) {
-                    String value = headerJson.getString(header);
-                    if("Date".equals(header)&&refreshDate){
-                        value=DF_RFC.format(Instant.now());
-                    }
-                    cacheData.getHeaders().set(header, value);
+    private boolean hasCache(CacheData cacheData) {
+        try {
+            File fileMapping = cacheData.getFileMapping();
+            String queryString = cacheData.getQueryString();
+            File file = cacheData.getFile();
+            if(fileMapping.exists()&&fileMapping.length()>0&&!isExclude(cacheData.getFullURL(),cacheProperties.getExcludePattern())){
+                //获取文件参数
+                String fileStr = FileUtils.readFileToString(fileMapping, StandardCharsets.UTF_8);
+                JSONObject mapping = JSONObject.parseObject(fileStr);
+                //判断是否存在QueryString并匹配
+                if(StringUtils.isNotBlank(queryString)&&!JSONPathExtra.containsValue(mapping,"$.request.queryString",queryString)){
+                    //不匹配
+                    return false;
                 }
-                return true;
+                //匹配一致则使用缓存
+                if(file.exists()&&file.length()>0) {
+                    logger.info("[{}]Cache:{}",cacheData.getHttpStatus().value(),cacheData.getFullURL());
+                    //回写header
+                    JSONObject headerJson= (JSONObject) JSONPath.eval(mapping,"$.response.headers");
+                    for (String header : headerJson.keySet()) {
+                        String value = headerJson.getString(header);
+                        if("Date".equals(header)&&refreshDate){
+                            value=DF_RFC.format(Instant.now());
+                        }
+                        cacheData.getHeaders().set(header, value);
+                    }
+                    return true;
+                }
             }
+            return false;
+        }catch (Exception e){
+            //缓存异常则认为不存在缓存
+            logger.warn("cache error[{}]:{}",e.getMessage(),cacheData.getFullURL());
+            return false;
         }
-        return false;
+
     }
 
     private boolean isExclude(String uri,List<Pattern> patternList){

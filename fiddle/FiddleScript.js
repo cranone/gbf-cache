@@ -149,7 +149,7 @@ class Handlers
     UI.actUpdateInspector(true,true);
 }
 
-    static var p_URIEndWith: String[] = [".png",".jpg",".mp3",".mp4",".css",".woff",".json",".js",".txt"];
+    static var p_URIEndWith: String[] = [".png",".jpg",".mp3",".mp4",".css",".woff",".json",".js",".txt",".bundle"];
     static var p_URIInclude: String[] = ["jewepri.com/ImageData"];
     //static var p_URIExculde: String[] = ["deepone-online.com/footer/js/footer.js"];
 
@@ -240,6 +240,11 @@ class Handlers
         oSession.responseCode = 304;
         oSession["ui-backcolor"] = "Lavender";
         //return;
+    }
+    if(url.Contains("cdn-connect.mobage.jp")){
+        oSession.utilCreateResponseAndBypassServer();
+        oSession.responseCode = 500;
+        oSession["ui-backcolor"] = "Lavender";
     }
     //FiddlerApplication.Log.LogString(StrArrEndWith(url,p_URIEndWith)+"TEST");
     if (!oSession.HTTPMethodIs("CONNECT")&&(StrArrEndWith(url.Substring(0,url.IndexOf("?")>0?url.IndexOf("?"):url.Length),p_URIEndWith)||StrArrInclude(url,p_URIInclude))){
