@@ -1,0 +1,20 @@
+cache:
+  net:
+    #读取超时时间(毫秒)
+    ReadTimeout: 5000
+    #连接超时时间(毫秒)
+    connectTimeout: 2000
+  #path
+  path: F:/Services/Caches
+  #是否刷新响应修改时间
+  refreshDate: true
+  retry:
+    #重试延迟
+    delay: 500
+    #重试次数
+    maxAttempts: 3
+  #缓存排除地址
+  urlExclude:
+    - deepone-online.com/footer/js/footer.js
+    - mist-train-girls.com/production-client-web-static/Information/js
+    - mist-train-girls.com/production-client-web-static/MasterData

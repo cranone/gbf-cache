@@ -1,0 +1,32 @@
+server:
+  #server port
+  port: 8080
+  #tomcat
+  tomcat:
+    accept-count: 50
+    max-connections: 200
+    threads:
+      max: 200
+      min-spare: 20
+
+spring:
+  flyway:
+    schemas:
+      - 1
+  #扩展配置文件
+  profiles:
+    include: config
+
+#log
+logging:
+  file:
+    name: cache.log
+    path: logs
+  level:
+    root: info
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${LOG_FILE}.%d{yyyy-MM-dd}.%i.log
+      max-file-size: 50MB
+      max-history: 7
+
