@@ -18,3 +18,7 @@ cache:
     - deepone-online.com/footer/js/footer.js
     - mist-train-girls.com/production-client-web-static/Information/js
     - mist-train-girls.com/production-client-web-static/MasterData
+  suffix: png|jpg|mp3|mp4|css|woff|json|js|txt|bundle
+  ssl:
+    cert: classpath:gbf_cache.pfx
+    password: gbf_cache

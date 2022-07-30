@@ -1,0 +1,77 @@
+package com.shadego.gbf.proxy;
+
+import com.github.monkeywie.proxyee.intercept.HttpProxyIntercept;
+import com.github.monkeywie.proxyee.intercept.HttpProxyInterceptPipeline;
+import com.shadego.gbf.entity.param.DownloadData;
+import com.shadego.gbf.service.CacheService;
+import com.shadego.gbf.utils.NettyUtil;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.Channel;
+import io.netty.handler.codec.http.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.Resource;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+@Component
+public class CacheProxyIntercept extends HttpProxyIntercept {
+    private static final Logger logger = LoggerFactory.getLogger(HttpProxyIntercept.class);
+
+    @Resource
+    private CacheService cacheService;
+    @Value("${cache.suffix}")
+    private String supportSuffix;
+
+    @Override
+    public void beforeRequest(Channel clientChannel, HttpRequest httpRequest, HttpProxyInterceptPipeline pipeline) throws Exception {
+        logger.debug("beforeRequest httpRequest");
+        String uri = httpRequest.uri();
+        String url=NettyUtil.getURL(pipeline);
+        logger.debug("netty url:{},uri:{}",url,uri);
+        org.springframework.http.HttpHeaders springHeaders = NettyUtil.toSpringHeader(httpRequest.headers());
+        Pattern pat=Pattern.compile("[\\w]+[\\.]("+supportSuffix+")");//正则判断
+        Matcher mc=pat.matcher(uri);//条件匹配
+        if(mc.find()){
+            DownloadData data = cacheService.download(url, uri, springHeaders);
+            HttpResponse hookResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(data.getHttpCode()),NettyUtil.fromSpringHeader(data.getResponseHeader()));
+            clientChannel.writeAndFlush(hookResponse);
+            Path path = Paths.get(data.getPath());
+            byte[] result= Files.readAllBytes(path);
+            ByteBuf byteBufN = ByteBufAllocator.DEFAULT.heapBuffer(result.length);
+            byteBufN.writeBytes(result);
+            HttpContent lastContent = new DefaultLastHttpContent(byteBufN);
+            clientChannel.writeAndFlush(lastContent);
+            clientChannel.close();
+            return;
+        }
+
+        super.beforeRequest(clientChannel, httpRequest, pipeline);
+    }
+
+    @Override
+    public void beforeRequest(Channel clientChannel, HttpContent httpContent, HttpProxyInterceptPipeline pipeline) throws Exception {
+        logger.debug("beforeRequest httpContent");
+        super.beforeRequest(clientChannel, httpContent, pipeline);
+    }
+
+    @Override
+    public void afterResponse(Channel clientChannel, Channel proxyChannel, HttpResponse httpResponse, HttpProxyInterceptPipeline pipeline) throws Exception {
+        logger.debug("afterResponse httpResponse");
+        logger.info("Direct:{}",NettyUtil.getURL(pipeline));
+        super.afterResponse(clientChannel, proxyChannel, httpResponse, pipeline);
+    }
+
+    @Override
+    public void afterResponse(Channel clientChannel, Channel proxyChannel, HttpContent httpContent, HttpProxyInterceptPipeline pipeline) throws Exception {
+        logger.debug("afterResponse httpContent");
+        super.afterResponse(clientChannel, proxyChannel, httpContent, pipeline);
+    }
+}

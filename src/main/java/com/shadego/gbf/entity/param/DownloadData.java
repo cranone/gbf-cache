@@ -1,5 +1,6 @@
 package com.shadego.gbf.entity.param;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 
 public class DownloadData {
@@ -7,6 +8,7 @@ public class DownloadData {
     private boolean isCached;
     private Integer httpCode;
     private boolean isSuccess;
+    private HttpHeaders responseHeader;
 
     public DownloadData(){
         //默认500
@@ -43,5 +45,13 @@ public class DownloadData {
 
     public void setSuccess(boolean success) {
         isSuccess = success;
+    }
+
+    public HttpHeaders getResponseHeader() {
+        return responseHeader;
+    }
+
+    public void setResponseHeader(HttpHeaders responseHeader) {
+        this.responseHeader = responseHeader;
     }
 }

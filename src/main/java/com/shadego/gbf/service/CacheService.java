@@ -32,10 +32,9 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 @Service
@@ -56,8 +55,8 @@ public class CacheService {
     public ResponseEntity<byte[]> createResponseString(HttpServletRequest request){
         ResponseEntity<byte[]> response=null;
         try {
-            HttpHeaders headers = new HttpHeaders();
-            DownloadData data = this.download(request,headers);
+            DownloadData data = this.download(request);
+            HttpHeaders headers = data.getResponseHeader();
             JSON json=(JSON) JSON.parse(FileUtils.readFileToString(new File(data.getPath()),StandardCharsets.UTF_8), JSONReader.Feature.UseNativeObject);
             String str=JSON.toJSONString(json);
             byte[] result=str.getBytes(StandardCharsets.UTF_8);
@@ -75,8 +74,8 @@ public class CacheService {
     public ResponseEntity<byte[]> createResponse(HttpServletRequest request){
         ResponseEntity<byte[]> response=null;
         try {
-            HttpHeaders headers = new HttpHeaders();
-            DownloadData data = this.download(request,headers);
+            DownloadData data = this.download(request);
+            HttpHeaders headers = data.getResponseHeader();
             byte[] result=null;
             if(data.getSuccess()){
                 Path path = Paths.get(data.getPath());
@@ -90,29 +89,48 @@ public class CacheService {
         return response;
     }
 
-    private DownloadData download(HttpServletRequest request, HttpHeaders headers) throws IOException {
+    public DownloadData download(HttpServletRequest request) throws IOException {
+        String uri= request.getRequestURI();
+        String url=request.getRequestURL().toString();
+        String queryString=request.getQueryString();
+        if(StringUtils.isNotBlank(queryString)){
+            url+="?"+queryString;
+        }
+        Enumeration<String> headerNames = request.getHeaderNames();
+        HttpHeaders requestHeader=new HttpHeaders();
+        while(headerNames.hasMoreElements()){
+            String str = headerNames.nextElement();
+            requestHeader.put(str, Collections.singletonList(request.getHeader(str)));
+        }
+        return this.download(url,uri,requestHeader);
+    }
+
+    public DownloadData download(String url,String uri,HttpHeaders requestHeader) throws IOException{
         DownloadData data=new DownloadData();
+        HttpHeaders responseHeaders=new HttpHeaders();
+        data.setResponseHeader(responseHeaders);
         //获取URL
-        String fullURL=request.getRequestURL().toString();
-        if(StringUtils.isNotBlank(request.getHeader("my-https"))){
+        String fullURL=url;
+        if(!CollectionUtils.isEmpty(requestHeader.get("my-https"))){
             fullURL=fullURL.replaceAll("http://","https://");
         }
-        //获取URI
-        String uri= request.getRequestURI();
         //获取顶级域名
         String topDomain=fullURL.replaceAll("http[s]?://.*?([\\w|\\-]+\\.\\w+)/.*", "$1");
-        //GET参数
-        String queryString=request.getQueryString();
-        String requestUrl=StringUtils.isBlank(queryString)?fullURL:fullURL+"?"+queryString;
         String fileName=cachePath+"/"+topDomain+uri;
+        //获取请求参数
+        String queryString=null;
+        if(uri.indexOf("?")>0){
+            queryString=uri.substring(uri.lastIndexOf("?")+1);
+            fileName=fileName.substring(0,fileName.indexOf("?"));
+        }
         File file=new File(fileName);
         File fileMapping=new File(fileName+".mapping");
         data.setPath(file.getPath());
-        boolean alwaysCache = this.isAlwaysCache(request);
+        boolean alwaysCache = this.isAlwaysCache(url,requestHeader);
         CacheData cacheData=new CacheData();
         cacheData.setFile(file);
         cacheData.setFileMapping(fileMapping);
-        cacheData.setHeaders(headers);
+        cacheData.setHeaders(responseHeaders);
         cacheData.setFullURL(fullURL);
         cacheData.setQueryString(queryString);
         cacheData.setAlwaysCache(alwaysCache);
@@ -128,29 +146,19 @@ public class CacheService {
         logger.info("Create:{}",fullURL);
         JSONObject mapping=new JSONObject();
         JSONPath.set(mapping,"$.request.queryString",queryString);
-        Enumeration<String> headerNames = request.getHeaderNames();
-        Map<String, String> requestHeaders=new HashMap<>();
-        while(headerNames.hasMoreElements()){
-            String str = headerNames.nextElement();
-            //https请求
-            if("my-https".equals(str)){
-                continue;
-            }
-            requestHeaders.put(str,request.getHeader(str));
-        }
-
+        requestHeader.remove("my-https");
         try {
-            ResponseEntity<byte[]> result = netService.getBytes(requestUrl, requestHeaders);
+            ResponseEntity<byte[]> result = netService.getBytes(fullURL, requestHeader);
             data.setHttpCode(result.getStatusCodeValue());
             if(!result.getStatusCode().is2xxSuccessful()){
                 throw new CacheException("服务器响应状态错误:"+data.getHttpCode());
             }
             JSONObject headerJson = new JSONObject();
-            headers.set("Access-Control-Allow-Origin", "*");
+            responseHeaders.set("Access-Control-Allow-Origin", "*");
             headerJson.put("Access-Control-Allow-Origin", "*");
             result.getHeaders().forEach((key, value) -> {
                 String headerValue = value.get(0);
-                headers.set(key, headerValue);
+                responseHeaders.set(key, headerValue);
                 headerJson.put(key, headerValue);
             });
             JSONPath.set(mapping, "$.response.headers", headerJson);
@@ -224,12 +232,12 @@ public class CacheService {
         return false;
     }
 
-    private boolean isAlwaysCache(HttpServletRequest request){
-        if(isExclude(request.getRequestURL().toString(), cacheProperties.getExcludeModifiedPattern())){
+    private boolean isAlwaysCache(String url,HttpHeaders requestHeader){
+        if(isExclude(url, cacheProperties.getExcludeModifiedPattern())){
             return false;
         }
-        return StringUtils.isNotBlank(request.getHeader("If-Modified-Since"))
-                ||StringUtils.isNotBlank(request.getHeader("If-None-Match"));
+        return !CollectionUtils.isEmpty(requestHeader.get("If-Modified-Since"))
+                ||!CollectionUtils.isEmpty(requestHeader.get("If-None-Match"));
     }
 
 }
