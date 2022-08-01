@@ -5,11 +5,12 @@ import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONPath;
 import com.alibaba.fastjson2.JSONReader;
 import com.shadego.gbf.entity.param.CacheData;
-import com.shadego.gbf.entity.param.CacheProperties;
 import com.shadego.gbf.entity.param.DownloadData;
+import com.shadego.gbf.entity.param.UrlProperties;
 import com.shadego.gbf.exception.CacheException;
 import com.shadego.gbf.utils.GZIPCompression;
 import com.shadego.gbf.utils.JSONPathExtra;
+import com.shadego.gbf.utils.UrlUtil;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -35,7 +36,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.regex.Pattern;
 
 @Service
 public class CacheService {
@@ -48,7 +48,7 @@ public class CacheService {
     @Value("${cache.refreshDate}")
     private Boolean refreshDate;
     @Resource
-    private CacheProperties cacheProperties;
+    private UrlProperties urlProperties;
     @Resource
     private NetService netService;
 
@@ -189,7 +189,7 @@ public class CacheService {
             File fileMapping = cacheData.getFileMapping();
             String queryString = cacheData.getQueryString();
             File file = cacheData.getFile();
-            if(fileMapping.exists()&&fileMapping.length()>0&&!isExclude(cacheData.getFullURL(),cacheProperties.getExcludePattern())){
+            if(fileMapping.exists()&&fileMapping.length()>0&&!UrlUtil.isCompile(cacheData.getFullURL(), urlProperties.getExcludePattern())){
                 //获取文件参数
                 String fileStr = FileUtils.readFileToString(fileMapping, StandardCharsets.UTF_8);
                 JSONObject mapping = JSONObject.parseObject(fileStr);
@@ -222,18 +222,8 @@ public class CacheService {
 
     }
 
-    private boolean isExclude(String uri,List<Pattern> patternList){
-        //判断是否被排除
-        for (Pattern pattern : patternList) {
-            if(pattern.matcher(uri).find()){
-                return true;
-            }
-        }
-        return false;
-    }
-
     private boolean isAlwaysCache(String url,HttpHeaders requestHeader){
-        if(isExclude(url, cacheProperties.getExcludeModifiedPattern())){
+        if(UrlUtil.isCompile(url, urlProperties.getExcludeModifiedPattern())){
             return false;
         }
         return !CollectionUtils.isEmpty(requestHeader.get("If-Modified-Since"))

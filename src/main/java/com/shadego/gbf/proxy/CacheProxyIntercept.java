@@ -3,15 +3,16 @@ package com.shadego.gbf.proxy;
 import com.github.monkeywie.proxyee.intercept.HttpProxyIntercept;
 import com.github.monkeywie.proxyee.intercept.HttpProxyInterceptPipeline;
 import com.shadego.gbf.entity.param.DownloadData;
+import com.shadego.gbf.entity.param.UrlProperties;
 import com.shadego.gbf.service.CacheService;
 import com.shadego.gbf.utils.NettyUtil;
+import com.shadego.gbf.utils.UrlUtil;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -27,8 +28,8 @@ public class CacheProxyIntercept extends HttpProxyIntercept {
 
     @Resource
     private CacheService cacheService;
-    @Value("${cache.suffix}")
-    private String supportSuffix;
+    @Resource
+    private UrlProperties urlProperties;
 
     @Override
     public void beforeRequest(Channel clientChannel, HttpRequest httpRequest, HttpProxyInterceptPipeline pipeline) throws Exception {
@@ -36,8 +37,14 @@ public class CacheProxyIntercept extends HttpProxyIntercept {
         String uri = httpRequest.uri();
         String url=NettyUtil.getURL(pipeline);
         logger.debug("netty url:{},uri:{}",url,uri);
+        //判断是否block
+        if(UrlUtil.isCompile(url,urlProperties.getBlockPattern())){
+            logger.info("block:{}",url);
+            HttpResponse hookResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+            clientChannel.writeAndFlush(hookResponse);
+        }
         org.springframework.http.HttpHeaders springHeaders = NettyUtil.toSpringHeader(httpRequest.headers());
-        Pattern pat=Pattern.compile("[\\w]+[\\.]("+supportSuffix+")");//正则判断
+        Pattern pat=Pattern.compile("[\\w]+[\\.]("+urlProperties.getSuffix()+")");//正则判断
         Matcher mc=pat.matcher(uri);//条件匹配
         if(mc.find()){
             DownloadData data = cacheService.download(url, uri, springHeaders);

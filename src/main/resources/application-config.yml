@@ -13,12 +13,20 @@ cache:
     delay: 500
     #重试次数
     maxAttempts: 3
-  #缓存排除地址
-  urlExclude:
-    - deepone-online.com/footer/js/footer.js
-    - mist-train-girls.com/production-client-web-static/Information/js
-    - mist-train-girls.com/production-client-web-static/MasterData
-  suffix: png|jpg|mp3|mp4|css|woff|json|js|txt|bundle
+  url:
+    #缓存排除地址
+    exclude:
+      - deepone-online.com/footer/js/footer.js
+      - mist-train-girls.com/production-client-web-static/Information/js
+      - mist-train-girls.com/production-client-web-static/MasterData
+    #403排除地址
+    excludeModified:
+    #阻止地址(优先级最高)
+    block:
+    #代理后缀
+    suffix: png|jpg|mp3|mp4|css|woff|json|js|txt|bundle
   ssl:
+    #证书路径
     cert: classpath:gbf_cache.pfx
+    #证书密码
     password: gbf_cache
