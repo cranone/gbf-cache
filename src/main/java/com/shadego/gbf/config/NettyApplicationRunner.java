@@ -50,7 +50,7 @@ public class NettyApplicationRunner implements ApplicationRunner, ApplicationLis
         this.httpProxyServer = new HttpProxyServer().serverConfig(config).caCertFactory(pfxCertFactory)
                 .proxyInterceptInitializer(cacheProxyInterceptInitializer)
                 .httpProxyExceptionHandle(cacheProxyExceptionHandle);
-        this.httpProxyServer.start(port);
+        this.httpProxyServer.startAsync(port);
     }
 
     @Override
