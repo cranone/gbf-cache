@@ -2,6 +2,7 @@ package com.shadego.gbf.config;
 
 import com.alibaba.fastjson2.support.config.FastJsonConfig;
 import com.alibaba.fastjson2.support.spring.http.converter.FastJsonHttpMessageConverter;
+import okhttp3.OkHttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +19,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
@@ -25,7 +27,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private Integer connectTimeout;
     @Value("${cache.net.readTimeout:5000}")
     private Integer readTimeout;
-
 
     @Bean
     public RestTemplate getRestTemplate(){
@@ -40,6 +41,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
             }
         });
         return restTemplate;
+    }
+
+    @Bean
+    public OkHttpClient getOkHttpClient(){
+        return new OkHttpClient().newBuilder()
+                .connectTimeout(connectTimeout, TimeUnit.MILLISECONDS)
+                .readTimeout(readTimeout,TimeUnit.MILLISECONDS)
+                .build();
     }
 
 //    @Bean

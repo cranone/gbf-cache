@@ -1,34 +1,26 @@
 package com.shadego.gbf.service;
 
+import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.aop.framework.AopContext;
-import org.springframework.context.annotation.EnableAspectJAutoProxy;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
-import java.util.Map;
+import java.io.IOException;
 
-/**
- * 网络服务
- */
 @Service
-@EnableAspectJAutoProxy(proxyTargetClass = true, exposeProxy = true)
-public class NetService {
-    private static final Logger logger = LoggerFactory.getLogger(NetService.class);
+public class OkHttpService {
+    private static final Logger logger = LoggerFactory.getLogger(OkHttpService.class);
     @Resource
-    private RestTemplate restTemplate;
+    private OkHttpClient okHttpClient;
 
     @Retryable(value = RestClientException.class, maxAttemptsExpression = "${cache.retry.maxAttempts:3}",backoff = @Backoff(delayExpression = "${cache.retry.delay:500}",multiplier = 0.0))
-    public ResponseEntity<byte[]> getBytes(String url, HttpHeaders headers){
+    public Response getBytes(String url, MultiValueMap<String, String> headers) throws IOException {
         logger.info("Downloading:{}", url);
         if(headers==null){
             headers=new HttpHeaders();
@@ -37,14 +29,16 @@ public class NetService {
         if(headers.get("user-agent")==null&&headers.get("User-Agent")==null){
             headers.set("user-agent","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36");
         }
-        return restTemplate.exchange(url, HttpMethod.GET,new HttpEntity<>(headers),byte[].class);
+        return this.get(url,headers);
     }
 
-    public ResponseEntity<byte[]> getBytes(String url, Map<String, String> headers){
-        HttpHeaders httpHeaders=new HttpHeaders();
+    private Response get(String url,MultiValueMap<String, String> headers) throws IOException {
+        Headers.Builder builder = new Headers.Builder();
         if(headers!=null){
-            httpHeaders.setAll(headers);
+            headers.toSingleValueMap().forEach(builder::add);
         }
-        return ((NetService)AopContext.currentProxy()).getBytes(url,httpHeaders);
+        Request request = new Request.Builder().url(url).headers(builder.build()).build();
+        Call call = okHttpClient.newCall(request);
+        return call.execute();
     }
 }

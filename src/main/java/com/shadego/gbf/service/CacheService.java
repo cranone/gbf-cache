@@ -11,6 +11,8 @@ import com.shadego.gbf.exception.CacheException;
 import com.shadego.gbf.utils.GZIPCompression;
 import com.shadego.gbf.utils.JSONPathExtra;
 import com.shadego.gbf.utils.UrlUtil;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -51,6 +53,8 @@ public class CacheService {
     private UrlProperties urlProperties;
     @Resource
     private NetService netService;
+    @Resource
+    private OkHttpService okHttpService;
 
     public ResponseEntity<byte[]> createResponseString(HttpServletRequest request){
         ResponseEntity<byte[]> response=null;
@@ -148,23 +152,25 @@ public class CacheService {
         JSONPath.set(mapping,"$.request.queryString",queryString);
         requestHeader.remove("my-https");
         try {
-            ResponseEntity<byte[]> result = netService.getBytes(fullURL, requestHeader);
-            data.setHttpCode(result.getStatusCodeValue());
-            if(!result.getStatusCode().is2xxSuccessful()){
+            Response result = okHttpService.getBytes(fullURL, requestHeader);
+            data.setHttpCode(result.code());
+            if(!result.isSuccessful()){
                 throw new CacheException("服务器响应状态错误:"+data.getHttpCode());
             }
             JSONObject headerJson = new JSONObject();
             responseHeaders.set("Access-Control-Allow-Origin", "*");
             headerJson.put("Access-Control-Allow-Origin", "*");
-            result.getHeaders().forEach((key, value) -> {
-                String headerValue = value.get(0);
-                responseHeaders.set(key, headerValue);
-                headerJson.put(key, headerValue);
+            result.headers().forEach(pair -> {
+                responseHeaders.set(pair.getFirst(), pair.getSecond());
+                headerJson.put(pair.getFirst(), pair.getSecond());
             });
             JSONPath.set(mapping, "$.response.headers", headerJson);
             //写入映射文件
             FileUtils.writeStringToFile(fileMapping, mapping.toJSONString(), StandardCharsets.UTF_8);
-            byte[] body = result.getBody();
+//            byte[] body = result.getBody();
+//            byte[] body = result.body();
+            ResponseBody resultBody = result.body();
+            byte[] body = resultBody ==null?null: resultBody.bytes();
             if(body==null){
                 throw new CacheException("服务器无响应数据");
             }

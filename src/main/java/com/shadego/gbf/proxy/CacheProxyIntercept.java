@@ -39,9 +39,12 @@ public class CacheProxyIntercept extends HttpProxyIntercept {
         logger.debug("netty url:{},uri:{}",url,uri);
         //判断是否block
         if(UrlUtil.isCompile(url,urlProperties.getBlockPattern())){
-            logger.info("block:{}",url);
-            HttpResponse hookResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+            HttpResponseStatus code = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+            logger.info("[{}]block:{}",code.code(),url);
+            HttpResponse hookResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, code);
             clientChannel.writeAndFlush(hookResponse);
+            clientChannel.close();
+            return;
         }
         org.springframework.http.HttpHeaders springHeaders = NettyUtil.toSpringHeader(httpRequest.headers());
         Pattern pat=Pattern.compile("[\\w]+[\\.]("+urlProperties.getSuffix()+")");//正则判断
