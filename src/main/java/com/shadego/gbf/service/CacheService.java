@@ -151,8 +151,7 @@ public class CacheService {
         JSONObject mapping=new JSONObject();
         JSONPath.set(mapping,"$.request.queryString",queryString);
         requestHeader.remove("my-https");
-        try {
-            Response result = okHttpService.getBytes(fullURL, requestHeader);
+        try (Response result = okHttpService.getBytes(fullURL, requestHeader)){
             data.setHttpCode(result.code());
             if(!result.isSuccessful()){
                 throw new CacheException("服务器响应状态错误:"+data.getHttpCode());
