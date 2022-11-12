@@ -151,6 +151,7 @@ public class CacheService {
         JSONObject mapping=new JSONObject();
         JSONPath.set(mapping,"$.request.queryString",queryString);
         requestHeader.remove("my-https");
+        logger.info("Downloading:{}", url);
         try (Response result = okHttpService.getBytes(fullURL, requestHeader)){
             data.setHttpCode(result.code());
             if(!result.isSuccessful()){

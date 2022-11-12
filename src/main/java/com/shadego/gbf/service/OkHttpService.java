@@ -21,7 +21,6 @@ public class OkHttpService {
 
     @Retryable(value = RestClientException.class, maxAttemptsExpression = "${cache.retry.maxAttempts:3}",backoff = @Backoff(delayExpression = "${cache.retry.delay:500}",multiplier = 0.0))
     public Response getBytes(String url, MultiValueMap<String, String> headers) throws IOException {
-        logger.info("Downloading:{}", url);
         if(headers==null){
             headers=new HttpHeaders();
         }
