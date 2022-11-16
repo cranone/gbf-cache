@@ -8,7 +8,6 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestClientException;
 
 import javax.annotation.Resource;
 import java.io.IOException;
@@ -19,7 +18,7 @@ public class OkHttpService {
     @Resource
     private OkHttpClient okHttpClient;
 
-    @Retryable(value = RestClientException.class, maxAttemptsExpression = "${cache.retry.maxAttempts:3}",backoff = @Backoff(delayExpression = "${cache.retry.delay:500}",multiplier = 0.0))
+    @Retryable(value = IOException.class, maxAttemptsExpression = "${cache.retry.maxAttempts:3}",backoff = @Backoff(delayExpression = "${cache.retry.delay:500}",multiplier = 0.0))
     public Response getBytes(String url, MultiValueMap<String, String> headers) throws IOException {
         if(headers==null){
             headers=new HttpHeaders();
