@@ -5,14 +5,13 @@ import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONPath;
 import com.alibaba.fastjson2.JSONReader;
 import com.shadego.gbf.entity.param.CacheData;
-import com.shadego.gbf.entity.param.DownloadData;
+import com.shadego.gbf.entity.param.ResponseData;
 import com.shadego.gbf.entity.param.UrlProperties;
 import com.shadego.gbf.exception.CacheException;
 import com.shadego.gbf.utils.GZIPCompression;
+import com.shadego.gbf.utils.HeaderUtil;
 import com.shadego.gbf.utils.JSONPathExtra;
 import com.shadego.gbf.utils.UrlUtil;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -35,9 +34,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
+import java.util.*;
 
 @Service
 public class CacheService {
@@ -52,15 +49,13 @@ public class CacheService {
     @Resource
     private UrlProperties urlProperties;
     @Resource
-    private NetService netService;
-    @Resource
     private OkHttpService okHttpService;
 
     public ResponseEntity<byte[]> createResponseString(HttpServletRequest request){
         ResponseEntity<byte[]> response=null;
         try {
-            DownloadData data = this.download(request);
-            HttpHeaders headers = data.getResponseHeader();
+            CacheData data = this.download(request);
+            HttpHeaders headers = HeaderUtil.toSpringHeader(data.getResponseHeaders());
             JSON json=(JSON) JSON.parse(FileUtils.readFileToString(new File(data.getPath()),StandardCharsets.UTF_8), JSONReader.Feature.UseNativeObject);
             String str=JSON.toJSONString(json);
             byte[] result=str.getBytes(StandardCharsets.UTF_8);
@@ -78,10 +73,10 @@ public class CacheService {
     public ResponseEntity<byte[]> createResponse(HttpServletRequest request){
         ResponseEntity<byte[]> response=null;
         try {
-            DownloadData data = this.download(request);
-            HttpHeaders headers = data.getResponseHeader();
+            CacheData data = this.download(request);
+            HttpHeaders headers = HeaderUtil.toSpringHeader(data.getResponseHeaders());
             byte[] result=null;
-            if(data.getSuccess()){
+            if(data.isSuccess()){
                 Path path = Paths.get(data.getPath());
                 result=Files.readAllBytes(path);
             }
@@ -93,7 +88,7 @@ public class CacheService {
         return response;
     }
 
-    public DownloadData download(HttpServletRequest request) throws IOException {
+    public CacheData download(HttpServletRequest request) throws IOException {
         String uri= request.getRequestURI();
         String url=request.getRequestURL().toString();
         String queryString=request.getQueryString();
@@ -109,10 +104,11 @@ public class CacheService {
         return this.download(url,uri,requestHeader);
     }
 
-    public DownloadData download(String url,String uri,HttpHeaders requestHeader) throws IOException{
-        DownloadData data=new DownloadData();
-        HttpHeaders responseHeaders=new HttpHeaders();
-        data.setResponseHeader(responseHeaders);
+    public CacheData download(String url,String uri,HttpHeaders requestHeader) throws IOException{
+        CacheData data=new CacheData();
+//        HttpHeaders responseHeaders=new HttpHeaders();
+        Map<String,String> responseHeaders=new LinkedHashMap<>();
+        data.setResponseHeaders(responseHeaders);
         //获取URL
         String fullURL=url;
         if(!CollectionUtils.isEmpty(requestHeader.get("my-https"))){
@@ -131,17 +127,16 @@ public class CacheService {
         File fileMapping=new File(fileName+".mapping");
         data.setPath(file.getPath());
         boolean alwaysCache = this.isAlwaysCache(url,requestHeader);
-        CacheData cacheData=new CacheData();
-        cacheData.setFile(file);
-        cacheData.setFileMapping(fileMapping);
-        cacheData.setHeaders(responseHeaders);
-        cacheData.setFullURL(fullURL);
-        cacheData.setQueryString(queryString);
-        cacheData.setAlwaysCache(alwaysCache);
+        data.setFile(file);
+        data.setFileMapping(fileMapping);
+        data.setResponseHeaders(responseHeaders);
+        data.setFullURL(fullURL);
+        data.setQueryString(queryString);
+        data.setAlwaysCache(alwaysCache);
         //从本地读取缓存
-        if(this.hasCache(cacheData)){
+        if(this.hasCache(data)){
             data.setSuccess(!alwaysCache);
-            data.setHttpCode(cacheData.getHttpStatus().value());
+            data.setHttpCode(data.getHttpStatus().value());
             data.setCached(true);
             return data;
         }
@@ -152,25 +147,23 @@ public class CacheService {
         JSONPath.set(mapping,"$.request.queryString",queryString);
         requestHeader.remove("my-https");
         logger.info("Downloading:{}", url);
-        try (Response result = okHttpService.getBytes(fullURL, requestHeader)){
-            data.setHttpCode(result.code());
+        try{
+            ResponseData result = okHttpService.getBytes(fullURL, requestHeader);
+            data.setHttpCode(result.getCode());
             if(!result.isSuccessful()){
                 throw new CacheException("服务器响应状态错误:"+data.getHttpCode());
             }
             JSONObject headerJson = new JSONObject();
-            responseHeaders.set("Access-Control-Allow-Origin", "*");
+            responseHeaders.put("Access-Control-Allow-Origin", "*");
             headerJson.put("Access-Control-Allow-Origin", "*");
-            result.headers().forEach(pair -> {
-                responseHeaders.set(pair.getFirst(), pair.getSecond());
-                headerJson.put(pair.getFirst(), pair.getSecond());
+            result.getHeaders().forEach((key,value)->{
+                responseHeaders.put(key, value);
+                headerJson.put(key, value);
             });
             JSONPath.set(mapping, "$.response.headers", headerJson);
             //写入映射文件
             FileUtils.writeStringToFile(fileMapping, mapping.toJSONString(), StandardCharsets.UTF_8);
-//            byte[] body = result.getBody();
-//            byte[] body = result.body();
-            ResponseBody resultBody = result.body();
-            byte[] body = resultBody ==null?null: resultBody.bytes();
+            byte[] body=result.getBody();
             if(body==null){
                 throw new CacheException("服务器无响应数据");
             }
@@ -214,7 +207,7 @@ public class CacheService {
                         if("Date".equals(header)&&refreshDate){
                             value=DF_RFC.format(Instant.now());
                         }
-                        cacheData.getHeaders().set(header, value);
+                        cacheData.getResponseHeaders().put(header, value);
                     }
                     return true;
                 }

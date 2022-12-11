@@ -1,17 +1,21 @@
 package com.shadego.gbf.entity.param;
 
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 
 import java.io.File;
+import java.util.Map;
 
 public class CacheData {
     private File file;
     private File fileMapping;
-    private HttpHeaders headers;
+    private Map<String,String> responseHeaders;
     private String fullURL;
     private String queryString;
     private boolean alwaysCache;
+    private String path;
+    private boolean isCached;
+    private Integer httpCode=HttpStatus.INTERNAL_SERVER_ERROR.value();
+    private boolean isSuccess;
 
     public HttpStatus getHttpStatus(){
         if(alwaysCache){
@@ -37,12 +41,12 @@ public class CacheData {
         this.fileMapping = fileMapping;
     }
 
-    public HttpHeaders getHeaders() {
-        return headers;
+    public Map<String,String> getResponseHeaders() {
+        return responseHeaders;
     }
 
-    public void setHeaders(HttpHeaders headers) {
-        this.headers = headers;
+    public void setResponseHeaders(Map<String,String> responseHeaders) {
+        this.responseHeaders = responseHeaders;
     }
 
     public String getFullURL() {
@@ -67,5 +71,37 @@ public class CacheData {
 
     public void setAlwaysCache(boolean alwaysCache) {
         this.alwaysCache = alwaysCache;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
+    }
+
+    public boolean isCached() {
+        return isCached;
+    }
+
+    public void setCached(boolean cached) {
+        isCached = cached;
+    }
+
+    public Integer getHttpCode() {
+        return httpCode;
+    }
+
+    public void setHttpCode(Integer httpCode) {
+        this.httpCode = httpCode;
+    }
+
+    public boolean isSuccess() {
+        return isSuccess;
+    }
+
+    public void setSuccess(boolean success) {
+        isSuccess = success;
     }
 }
