@@ -30,9 +30,10 @@ public class OkHttpService {
         if(headers.get("user-agent")==null&&headers.get("User-Agent")==null){
             headers.set("user-agent","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36");
         }
-        Response response = this.get(url, headers);
-        ResponseBody body = response.body();
-        return new ResponseData(response.code(), HeaderUtil.toMapHeader(response.headers()),body==null?null:body.bytes());
+        try (Response response = this.get(url, headers)){
+            ResponseBody body = response.body();
+            return new ResponseData(response.code(), HeaderUtil.toMapHeader(response.headers()),body==null?null:body.bytes());
+        }
     }
 
     private Response get(String url,MultiValueMap<String, String> headers) throws IOException {
